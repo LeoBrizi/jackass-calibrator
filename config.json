@@ -1,0 +1,16 @@
+{
+  "kinematic_params": [1.0, 1.0, 0.38],
+  "lidar_offset": [-0.13, 0.0, 0.0],
+  "joints_topic": "/j100_0819/platform/joint_states",
+  "joints_name_order": [
+    "rear_left_wheel_joint",
+    "front_left_wheel_joint",
+    "front_right_wheel_joint",
+    "rear_right_wheel_joint"
+  ],
+  "bag_path": "/mnt/usb-HKVSN_MD202_012938000AE9-0:0-part1/jackass/bags/rosbag2_2025_06_16-09_39_20",
+  "dump_file": "calib_dump.txt",
+  "laser_estimate": "/mnt/usb-HKVSN_MD202_012938000AE9-0:0-part1/jackass/bags/estimate.txt",
+  "laser_estimate_ig": [-0.15, 0.0, 0.0],
+  "min_time_diff": 0.01
+}
