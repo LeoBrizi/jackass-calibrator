@@ -86,5 +86,5 @@ if __name__ == "__main__":
     main()
 else:
     print("This script is intended to be run as a standalone program.")
-    print("Use 'python calib_associator.py <data_dir> <topic>' to execute it.")
+    print("Use 'python calib_associator.py <config_file>' to execute it.")
     sys.exit(1)

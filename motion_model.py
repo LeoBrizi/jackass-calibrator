@@ -13,6 +13,24 @@ class DDBodyFrameModel:
         self.v = 0.0  # Linear velocity
         self.omega = 0.0  # Angular velocity
 
+    def getParams(self):
+        """
+        Get the parameters of the model.
+        
+        :return: Tuple containing (k_r, k_l, baseline)
+        """
+        return np.array([self.k_r, self.k_l, self.baseline])
+    
+    def setParams(self, new_params):
+        """
+        Set the parameters of the model.
+
+        :param new_params: Array containing (k_r, k_l, baseline)
+        """
+        self.k_r = new_params[0]
+        self.k_l = new_params[1]
+        self.baseline = new_params[2]
+
     def getVel(self, vel_r, vel_l):
         """
         Calculate the pose change based on the velocities of the right and left wheels.
@@ -47,6 +65,38 @@ class DDBodyFrameModel:
         self.state[2] = (self.state[2] + np.pi) % (2 * np.pi) - np.pi
         
         return dx, dy, dtheta
+    
+    def getState(self):
+        """
+        Get the current state of the model.
+        
+        :return: Current state as a numpy array [x, y, theta]
+        """
+        return self.state.copy()
+    
+    def deepCopy(self):
+        """
+        Create a deep copy of the model.
+        
+        :return: A new instance of DDBodyFrameModel with the same parameters
+        """
+        copy = DDBodyFrameModel(self.k_r, self.k_l, self.baseline)
+        copy.state = self.state.copy()
+        copy.v_r = self.v_r
+        copy.v_l = self.v_l
+        copy.v = self.v
+        copy.omega = self.omega
+        return copy
+    
+    def reset(self):
+        """
+        Reset the state of the model to the initial state.
+        """
+        self.state = np.zeros(3)
+        self.v_r = 0.0
+        self.v_l = 0.0
+        self.v = 0.0
+        self.omega = 0.0
 
 class DDGlobalFrameModel:
     def __init__(self, k_r, k_l, baseline):
