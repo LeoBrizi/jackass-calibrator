@@ -82,7 +82,7 @@ def main():
 
     kinematic_parameters_ig = config.get("kinematic_params", [])
 
-    motion_model = DDBodyFrameModel(kinematic_parameters_ig[0], kinematic_parameters_ig[1], kinematic_parameters_ig[2])
+    motion_model = DDBodyFrameModel(kinematic_parameters_ig)
 
     # open the file
     output_file_path = Path(config.get("dump_file", "calib_dump.txt"))

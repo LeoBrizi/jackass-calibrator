@@ -73,7 +73,15 @@ class CalibSolver:
 
             # collect all the encoder measurements from prev_lidar_pose_index to current_index
 
-            encoder_measurements = encoder_data[ass_lidar[prev_lidar_pose_index]:ass_lidar[index]]
+            encoder_measurements = encoder_data[ass_lidar[prev_lidar_pose_index]:ass_lidar[index]+1]
+            # print("#"*10)
+            # print("first ts lidar:", lidar_data[prev_lidar_pose_index][0])
+            # print("first ts encoder:", encoder_measurements[0][0])
+            # print("time difference:", encoder_measurements[0][0] - lidar_data[prev_lidar_pose_index][0])
+            # print("second ts lidar:", lidar_data[index][0])
+            # print("second ts encoder:", encoder_measurements[-1][0])
+            # print("time difference:", encoder_measurements[-1][0] - lidar_data[index][0])
+            # print("#"*10)
 
             residual = self.error_(self.params, encoder_measurements, delta_pose_lidar)
 
@@ -122,6 +130,8 @@ class CalibSolver:
                 chi += residuals[i].T @ residuals[i]
 
             print("H det: ", np.linalg.det(H), " num of residuals: ", len(residuals))
+            H /= len(residuals)
+            b /= len(residuals)
             delta_params = np.linalg.solve(H, -b)
             
             self.params += delta_params.flatten()

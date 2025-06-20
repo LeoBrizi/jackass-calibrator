@@ -9,6 +9,7 @@
     "front_right_wheel_joint",
     "rear_right_wheel_joint"
   ],
+
   "bag_path": "/mnt/usb-HKVSN_MD202_012938000AE9-0:0-part1/jackass/bags/rosbag2_2025_06_16-09_39_20",
   "dump_file": "calib_dump.txt",
   "laser_estimate": "/mnt/usb-HKVSN_MD202_012938000AE9-0:0-part1/jackass/bags/estimate.txt",
@@ -16,9 +17,17 @@
   "min_time_diff": 0.01,
 
   "iterations": 40,
-  "tolerance": 1e-6,
+  "tolerance": 1e-7,
   "epsilon": 1e-6,
-  "dumping": 10,
+  "dumping": 1,
   "min_movement": 1,
-  "min_angle": 0.2
+  "min_angle": 0.2,
+
+  "time_period": 0.02,
+
+  "odom_topic": "jackass_odom",
+  "odom_frame": "odom",
+  "base_frame": "base_link",
+  "tf_prefix": "jackass",
+  "publish_tf": true
 }
