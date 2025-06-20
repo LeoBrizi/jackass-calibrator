@@ -6,7 +6,7 @@ import numpy as np
 import json
 
 from geometry import T,R, exp, log
-from motion_model import DDBodyFrameModel, DDGlobalFrameModel
+from motion_model import DDBodyFrameModel, DDGlobalFrameModel, SKSModel
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
@@ -23,24 +23,11 @@ class CalibSolver:
         self.epsilon = kwargs.pop('epsilon', 1e-6)
         self.dumping = kwargs.pop('dumping', 10)
         self.min_movement = kwargs.pop('min_movement', 1)
+        self.min_angle = kwargs.pop('min_angle', 0.1)
+
         self.incs = np.eye(len(self.params), dtype=np.float64) * self.epsilon
 
         self.stats = {}
-
-    # def error(self, params, vel_r, vel_l, dt, lidar_pose):
-    #     kin_model_temp = self.kinematic_model.deepCopy()
-    #     kin_model_temp.setParams(params[:3])
-
-    #     kin_model_temp.getPose(vel_r, vel_l, dt)
-    #     odom_state = kin_model_temp.getState()
-
-    #     T_lidar_offset = exp(params[3], params[4], params[5])
-    #     T_odom = exp(odom_state[0], odom_state[1], odom_state[2])
-    #     T_lidar = exp(lidar_pose[1], lidar_pose[2], lidar_pose[3])
-
-    #     residual = np.linalg.inv(T_lidar) @ np.linalg.inv(T_lidar_offset) @ T_odom @ T_lidar_offset
-
-    #     return log(residual).reshape((3, 1))
     
     def error_(self, params, encoder_measurements, delta_pose_lidar):
         """
@@ -49,7 +36,7 @@ class CalibSolver:
         """
         kin_model_temp = self.kinematic_model.deepCopy()
         kin_model_temp.reset()
-        kin_model_temp.setParams(params[:3])
+        kin_model_temp.setParams(params[:-3])
 
         prev_timestamp = encoder_measurements[0][0]  # First timestamp from the encoder data
 
@@ -60,7 +47,7 @@ class CalibSolver:
 
         odom_state = kin_model_temp.getState()
 
-        T_lidar_offset = exp(params[3], params[4], params[5])
+        T_lidar_offset = exp(params[-3], params[-2], params[-1])
         T_odom = exp(odom_state[0], odom_state[1], odom_state[2])
         # T_lidar = exp(delta_pose_lidar[0], delta_pose_lidar[1], delta_pose_lidar[2])
 
@@ -71,53 +58,17 @@ class CalibSolver:
         return log(residual).reshape((3, 1))
 
     def errorAndJacobian_(self, encoder_data, lidar_data, ass_lidar):
-        """
-        This function computes the residuals between the expected and actual poses
-        based on the encoder data and lidar associations.
-        """
-
-        """
-      
-        prev_timestamp = encoder_data[0][0]
-
-        for index, (encoder_ts, vel_r, vel_l) in enumerate(encoder_data):
-            dt = encoder_ts - prev_timestamp
-
-            motion = np.linalg.norm(self.kinematic_model.getState()[0:1])
-
-            if index not in ass_lidar or motion < self.min_movement:
-                self.kinematic_model.getPose(vel_r, vel_l, dt)
-                prev_timestamp = encoder_ts
-                continue
-
-            residual = self.error_(self.params, vel_r, vel_l, dt, lidar_data[ass_lidar[index]])
-            residuals.append(residual)
-
-            jacobian = np.zeros((3, len(self.params)))
-
-            for p in range(len(self.params)):
-                e_plus  = self.error_(self.params + self.incs[p,:], vel_r, vel_l, dt, lidar_data[ass_lidar[index]])
-                e_minus = self.error_(self.params - self.incs[p,:], vel_r, vel_l, dt, lidar_data[ass_lidar[index]])
-                jacobian[:, p] = ((e_plus - e_minus) / (2 * self.epsilon)).flatten()
-
-            jacobians.append(jacobian)
-
-            self.kinematic_model.getPose(vel_r, vel_l, dt)
-            prev_timestamp = encoder_ts
-            prev_pose = self.kinematic_model.getState()
-
-        """
-
         residuals = []
         jacobians = []
 
         encoder_measurements = []
         prev_lidar_pose = lidar_data[0]
         prev_lidar_pose_index = 0
+
         for index in tqdm(range(len(lidar_data))):
             delta_pose_lidar = np.linalg.inv(exp(prev_lidar_pose[1], prev_lidar_pose[2], prev_lidar_pose[3])) @ exp(lidar_data[index][1], lidar_data[index][2], lidar_data[index][3])
 
-            if np.linalg.norm(log(delta_pose_lidar)[0:2]) < self.min_movement:
+            if np.linalg.norm(log(delta_pose_lidar)[0:2]) < self.min_movement and np.abs(log(delta_pose_lidar)[2]) < self.min_angle:
                 continue
 
             # collect all the encoder measurements from prev_lidar_pose_index to current_index
@@ -157,18 +108,6 @@ class CalibSolver:
 
             residuals, jacobians = self.errorAndJacobian_(encoder_data, lidar_data, ass_lidar)
 
-            # #plot odom and lidar poses
-            # import matplotlib.pyplot as plt
-
-            # plt.figure(figsize=(10, 5))
-            # plt.title("Odometry vs. Lidar Poses")
-            # plt.plot([pose[0] for pose in odom_pose], [pose[1] for pose in odom_pose], 'r', label='Odometry')
-            # plt.plot([pose[0] for pose in lidar_pose], [pose[1] for pose in lidar_pose], 'b', label='Lidar')
-            # plt.xlabel("X")
-            # plt.ylabel("Y")
-            # plt.legend()
-            # plt.show()
-
             H = np.ones((len(self.params), len(self.params))) * self.dumping
             b = np.zeros((len(self.params), 1))
 
@@ -188,7 +127,7 @@ class CalibSolver:
             self.params += delta_params.flatten()
 
             # wrap angles
-            self.params[5] = (self.params[5] + np.pi) % (2 * np.pi) - np.pi
+            self.params[-1] = (self.params[-1] + np.pi) % (2 * np.pi) - np.pi
 
             delta_cost = abs(chi - prev_cost)
 
@@ -202,8 +141,8 @@ class CalibSolver:
                 print(f"Converged after {iteration} iterations")
                 break
             prev_cost = chi
-            self.kin_param = self.params[3:]
-            self.lidar_offset = self.params[3:]
+            self.kin_param = self.params[:-3]
+            self.lidar_offset = self.params[-3:]
 
         return H
 
@@ -228,8 +167,14 @@ def main():
         print("No dump file specified in the config. Make sure to run calib_dumper.py and calib_associator.py first")
         sys.exit(1)
 
+    kin_model_type = config.get("motion_model", "DDBodyFrame")
+
     lidar_pose_ig       = config.get("lidar_offset", [0.0, 0.0, 0.0])
-    kinematic_params_ig = config.get("kinematic_params", [0.0, 0.0, 0.0])
+    
+    if kin_model_type == "DDBodyFrame" : 
+        kinematic_params_ig = config.get("kinematic_params", [0.0, 0.0, 0.0])
+    else:
+        kinematic_params_ig = config.get("kinematic_params", [0.0, 0.0, 0.0, 0.0])
 
     encoder_data = []
     ass_lidar = {}
@@ -240,6 +185,7 @@ def main():
     epsilon = config.get("epsilon", 1e-6)
     dumping = config.get("dumping", 10)
     min_movement = config.get("min_movement", 1)
+    min_angle = config.get("min_angle", 0.1)
 
     with open(calib_data_file_name) as calib_data_file:
         lines = calib_data_file.readlines()
@@ -260,18 +206,24 @@ def main():
             lidar_x = float(data[6])
             lidar_y = float(data[7])
             lidar_theta = float(data[8])
-            lidar_ts = float(data[8])
+            lidar_ts = float(data[9])
 
             lidar_data.append((lidar_ts, lidar_x, lidar_y, lidar_theta))
             ass_lidar[len(lidar_data)-1] = i
-
-    calib_solver = CalibSolver(DDBodyFrameModel(*kinematic_params_ig), lidar_pose_ig, iteration=iteration, tolerance=tolerance, epsilon=epsilon, dumping=dumping, min_movement=min_movement)
+    
+    if kin_model_type == "DDBodyFrame" :
+        calib_solver = CalibSolver(DDBodyFrameModel(kinematic_params_ig), lidar_pose_ig, iteration=iteration, tolerance=tolerance, epsilon=epsilon, dumping=dumping, min_movement=min_movement, min_angle=min_angle)
+    else:
+        calib_solver = CalibSolver(SKSModel(kinematic_params_ig), lidar_pose_ig, iteration=iteration, tolerance=tolerance, epsilon=epsilon, dumping=dumping, min_movement=min_movement, min_angle=min_angle)
 
     calib_solver.solve(encoder_data, lidar_data, ass_lidar)
 
-    motion_model = DDBodyFrameModel(calib_solver.params[0], calib_solver.params[1], calib_solver.params[2])
+    if kin_model_type == "DDBodyFrame" :
+        motion_model = DDBodyFrameModel(calib_solver.kin_param)
+    else:
+        motion_model = SKSModel(calib_solver.kin_param)
 
-    T_offset_lidar = exp(calib_solver.params[3], calib_solver.params[4], calib_solver.params[5])
+    T_offset_lidar = exp(calib_solver.lidar_offset[0], calib_solver.lidar_offset[1], calib_solver.lidar_offset[2])
 
     odom_poses = []
 
@@ -285,6 +237,7 @@ def main():
 
         T_odom = exp(odom_state[0], odom_state[1], odom_state[2])
         T_lidar = np.linalg.inv(T_offset_lidar) @ T_odom @ T_offset_lidar
+
         odom_poses.append(log(T_lidar))
 
     # plot the odom and lidar trajectories

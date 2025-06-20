@@ -1,5 +1,6 @@
 {
-  "kinematic_params": [0.09318934, 0.09220674, 0.5334516],
+  "motion_model": "DDBodyFrame",
+  "kinematic_params": [0.09318934, 0.09220674, 0.38],
   "lidar_offset": [-0.16788207, 0.01099584, 0.00412516],
   "joints_topic": "/j100_0819/platform/joint_states",
   "joints_name_order": [
@@ -14,9 +15,10 @@
 
   "min_time_diff": 0.01,
 
-  "iterations": 30,
-  "tolerance": 1e-9,
+  "iterations": 40,
+  "tolerance": 1e-6,
   "epsilon": 1e-6,
   "dumping": 10,
-  "min_movement": 1
+  "min_movement": 1,
+  "min_angle": 0.2
 }
