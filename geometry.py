@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial.transform import Rotation
 
 def R(theta: float) -> np.ndarray:
     """
@@ -42,3 +43,30 @@ def log(T: np.ndarray) -> np.ndarray:
     x = T[0, 2]
     y = T[1, 2]
     return np.array([x, y, theta], dtype=np.float32)
+
+
+def compute_rotation_from_acc(acc_normalized):
+    a_x, a_y, a_z = acc_normalized
+
+    if a_z >= 0:
+        t = a_z + 1
+        k = np.sqrt(2 * t)
+        qw = np.sqrt(t / 2)
+        qx = -a_y / k
+        qy = a_x / k
+        qz = 0.0
+    else:
+        t = 1.0 - a_z
+        k = np.sqrt(2 * t)
+        qw = -a_y / k
+        qx = np.sqrt(t / 2)
+        qy = 0.0
+        qz = a_x / k
+
+    # Create quaternion [x, y, z, w]
+    q_acc = Rotation.from_quat([qx, qy, qz, qw])
+
+    # Equivalent to: q_acc.normalized().toRotationMatrix().transpose().cast<float>()
+    R_imu_in_world = q_acc.as_matrix().T.astype(np.float32)
+
+    return R_imu_in_world

@@ -24,6 +24,8 @@ class CalibSolver:
         self.dumping = kwargs.pop('dumping', 10)
         self.min_movement = kwargs.pop('min_movement', 1)
         self.min_angle = kwargs.pop('min_angle', 0.1)
+        self.params_mask = kwargs.pop('params_mask', [1, 1, 1, 1, 1, 1])
+        self.params_mask = np.array(self.params_mask, dtype=bool)
 
         self.incs = np.eye(len(self.params), dtype=np.float64) * self.epsilon
 
@@ -98,7 +100,8 @@ class CalibSolver:
               results = list(executor.map(compute_jacobian_col, range(len(self.params))))
 
             for p, res in enumerate(results):
-              jacobian[:, p] = res
+              if self.params_mask[p] != 0:
+                jacobian[:, p] = res
 
             jacobians.append(jacobian)
 
@@ -116,14 +119,14 @@ class CalibSolver:
 
             residuals, jacobians = self.errorAndJacobian_(encoder_data, lidar_data, ass_lidar)
 
-            H = np.ones((len(self.params), len(self.params))) * self.dumping
-            b = np.zeros((len(self.params), 1))
+            H = np.ones((self.params_mask.sum(), self.params_mask.sum())) * self.dumping
+            b = np.zeros((self.params_mask.sum(), 1))
 
             chi = 0
 
             for i in range(len(residuals)):
-                
-                J = jacobians[i]
+
+                J = jacobians[i][:, self.params_mask.astype(bool)]
                 H += J.T @ J
                 b += J.T @ residuals[i]
 
@@ -134,7 +137,7 @@ class CalibSolver:
             b /= len(residuals)
             delta_params = np.linalg.solve(H, -b)
             
-            self.params += delta_params.flatten()
+            self.params[self.params_mask.astype(bool)] += delta_params.flatten()
 
             # wrap angles
             self.params[-1] = (self.params[-1] + np.pi) % (2 * np.pi) - np.pi
@@ -196,6 +199,7 @@ def main():
     dumping = config.get("dumping", 10)
     min_movement = config.get("min_movement", 1)
     min_angle = config.get("min_angle", 0.1)
+    params_mask = config.get("params_mask", [1, 1, 1, 1, 1, 1])
 
     with open(calib_data_file_name) as calib_data_file:
         lines = calib_data_file.readlines()
@@ -222,11 +226,15 @@ def main():
             ass_lidar[len(lidar_data)-1] = i
     
     if kin_model_type == "DDBodyFrame" :
-        calib_solver = CalibSolver(DDBodyFrameModel(kinematic_params_ig), lidar_pose_ig, iteration=iteration, tolerance=tolerance, epsilon=epsilon, dumping=dumping, min_movement=min_movement, min_angle=min_angle)
+        calib_solver = CalibSolver(DDBodyFrameModel(kinematic_params_ig), lidar_pose_ig, iteration=iteration, tolerance=tolerance, epsilon=epsilon, dumping=dumping, min_movement=min_movement, min_angle=min_angle, params_mask=params_mask)
     else:
-        calib_solver = CalibSolver(SKSModel(kinematic_params_ig), lidar_pose_ig, iteration=iteration, tolerance=tolerance, epsilon=epsilon, dumping=dumping, min_movement=min_movement, min_angle=min_angle)
+        calib_solver = CalibSolver(SKSModel(kinematic_params_ig), lidar_pose_ig, iteration=iteration, tolerance=tolerance, epsilon=epsilon, dumping=dumping, min_movement=min_movement, min_angle=min_angle, params_mask=params_mask)
 
     calib_solver.solve(encoder_data, lidar_data, ass_lidar)
+
+    print('#'*4 + "BEST PARAMS" + '#'*4)
+    print("Best Kinematic Params: [" + ", ".join([f"{p}" for p in calib_solver.kin_param]) + "]")
+    print("Best Lidar Offset: [" + ", ".join([f"{o}" for o in calib_solver.lidar_offset]) + "]")
 
     if kin_model_type == "DDBodyFrame" :
         motion_model = DDBodyFrameModel(calib_solver.kin_param)

@@ -1,7 +1,11 @@
 {
   "motion_model": "DDBodyFrame",
-  "kinematic_params": [0.09318934, 0.09220674, 0.38],
-  "lidar_offset": [-0.16788207, 0.01099584, 0.00412516],
+  "kinematic_params": [
+    0.0924379711241535, 0.09206977407707143, 0.5372927964043419
+  ],
+  "lidar_offset": [
+    -0.16705944914964835, -0.002813190970535312, 0.008070034871175746
+  ],
   "joints_topic": "/j100_0819/platform/joint_states",
   "joints_name_order": [
     "rear_left_wheel_joint",
@@ -17,11 +21,12 @@
   "min_time_diff": 0.01,
 
   "iterations": 40,
-  "tolerance": 1e-7,
-  "epsilon": 1e-6,
+  "tolerance": 1e-8,
+  "epsilon": 1e-5,
   "dumping": 1,
-  "min_movement": 1,
+  "min_movement": 2,
   "min_angle": 0.2,
+  "params_mask": [1, 1, 1, 1, 1, 1],
 
   "time_period": 0.02,
 

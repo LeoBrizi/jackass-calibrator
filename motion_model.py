@@ -1,8 +1,11 @@
 
 import numpy as np
+
+from geometry import compute_rotation_from_acc
+from geometry import R, T, exp, log
     
 class DDBodyFrameModel:
-    def __init__(self, kin_params):
+    def __init__(self, kin_params, *args, **kwargs):
         self.k_r = kin_params[0]  # vel_to_meter
         self.k_l = kin_params[1]  # vel_to_meter
         self.baseline = kin_params[2]  # Distance between the wheels
@@ -99,7 +102,7 @@ class DDBodyFrameModel:
         self.omega = 0.0
 
 class SKSModel:
-    def __init__(self, kin_params) -> None:
+    def __init__(self, kin_params, *args, **kwargs) -> None:
         self.k_r = kin_params[0]  # vel_to_meter
         self.k_l = kin_params[1]  # vel_to_meter
         self.baseline = kin_params[2]  # Distance between the wheels
@@ -203,11 +206,12 @@ class SKSModel:
         self.omega = 0.0
 
 
-class DDGlobalFrameModel:
-    def __init__(self, k_r, k_l, baseline):
-        self.k_r = k_r
-        self.k_l = k_l
-        self.baseline = baseline
+class DDGyroModel:
+
+    def __init__(self, kin_params, *args, **kwargs):
+        self.k_r = kin_params[0]  # vel_to_meter
+        self.k_l = kin_params[1]  # vel_to_meter
+        self.baseline = kin_params[2]  # Distance between the wheels
 
         self.state = np.zeros(3)  # [x, y, theta]
         self.v_r = 0.0  # Right wheel velocity
@@ -215,33 +219,108 @@ class DDGlobalFrameModel:
         self.v = 0.0  # Linear velocity
         self.omega = 0.0  # Angular velocity
 
-    def getVel(self, vel_r, vel_l):
+        self.imu_measurement = []  # Placeholder for IMU measurement [ts, linear_acceleration 3x1, angular_velocity 3x1]
+        self.gyro_bias = np.zeros(3)
+
+        self.R_imu_in_world = np.eye(3)  # Rotation matrix from IMU to world frame
+        self.estimate_g = False
+        
+        self.min_time_still = kwargs.pop('min_time_still', 1.0)  # Minimum time to estimate gravity vector
+
+
+    def getParams(self):
+        return np.array([self.k_r, self.k_l, self.baseline])
+    
+    def setParams(self, new_params):
+        self.k_r = new_params[0]
+        self.k_l = new_params[1]
+        self.baseline = new_params[2]
+
+    def getLinearVel(self, vel_r, vel_l):
+        self.v_r = self.k_r * vel_r
+        self.v_l = self.k_l * vel_l
+        self.v = (self.v_r + self.v_l) / 2.0
+        # self.omega = (self.v_r - self.v_l) / self.baseline
+        return self.v
+
+    def estimateBias(self):
         """
-        Calculate the pose change based on the velocities of the right and left wheels.
+        Estimate the bias from the IMU measurement.
+        
+        :param imu_measurement: IMU measurement containing angular velocity
+        :return: Estimated bias
+        """
+        self.gyro_bias = np.mean([m[2] for m in self.imu_measurement], axis=0)
+        return self.gyro_bias
+    
+    def estimateGravityVector(self):
+        """
+        Estimate the gravity vector from the IMU measurements.
+        
+        :return: Estimated gravity vector
+        """
+        if len(self.imu_measurement) == 0:
+            print("No IMU measurements available to estimate gravity vector.")
+            return self.estimate_g
+        
+        time_still = self.imu_measurement[-1][0] - self.imu_measurement[0][0]
+        
+        if time_still < self.min_time_still:
+            print("Not enough time to estimate gravity vector.")
+            return self.estimate_g
+        # Assuming imu_measurement is a list of tuples (timestamp, linear_acceleration, angular_velocity)
+
+        # Step 1: Average the accelerometer measurements
+        acc_mean = np.mean([m[1] for m in self.imu_measurement], axis=0)
+        # Optional: Normalize if you only care about direction
+        acc_normalized = acc_mean / np.linalg.norm(acc_mean)
+
+        self.R_imu_in_world = compute_rotation_from_acc(acc_normalized)
+
+        self.estimate_g = True
+        return self.estimate_g
+    
+    def integralDeltaOmega(self, imu_measurements):
+        dtheta = 0.0
+        for index,imu_measurement in enumerate(imu_measurements):
+            if index == 0:
+                continue
+            ts, _, angular_velocity = imu_measurement
+            # Subtract the bias from the angular velocity
+            angular_velocity -= self.gyro_bias
+            
+            vel_aligned = R @ angular_velocity
+            omega = vel_aligned[2]
+            inc_theta = omega * (ts - imu_measurements[0][0])
+
+    def getPose(self, vel_r, vel_l, imu_measurements dt):
+        """
+        Calculate the pose change over a time step.
         
         :param vel_r: Velocity of the right wheel
         :param vel_l: Velocity of the left wheel
         :param dt: Time step
         :return: Pose change as a tuple (dx, dy, dtheta)
         """
-        self.v_r = self.k_r * vel_r
-        self.v_l = self.k_l * vel_l
-        self.v = (self.v_r + self.v_l) / 2.0
-        self.omega = (self.v_r - self.v_l) / self.baseline
-
-        return self.v, self.omega
-    
-    def getPose(self, vel_r, vel_l, dt):
-        """
-        Calculate the pose change over a time step.
+        self.getLinearVel(vel_r, vel_l)
         
-        :param dt: Time step
-        :return: Pose change as a tuple (dx, dy, dtheta)
-        """
-        self.getVel(vel_r, vel_l)
-        dtheta = self.omega * dt
-        dx = self.v * np.sin(self.state[2] + dtheta/2) / (self.state[2] + dtheta/2) * dt
-        dy = self.v * (1 - np.cos(self.state[2] + dtheta/2)) / (self.state[2] + dtheta/2) * dt
+        if self.v == 0.0:
+            self.imu_measurement.extend(imu_measurements)
+            return 0.0, 0.0, 0.0
+        else:
+            if not self.estimate_g:
+                self.estimateGravityVector()
+
+            if len(self.imu_measurement) > 1:
+                time_still = self.imu_measurement[-1][0] - self.imu_measurement[0][0]
+                if time_still > self.min_time_still:
+                    self.estimateBias()
+            self.imu_measurement = []  # Clear the IMU measurements after processing
+
+        
+            
+        dx = self.v * np.cos(self.state[2] + dtheta/2) * dt
+        dy = self.v * np.sin(self.state[2] + dtheta/2) * dt
 
         self.state[0] += dx
         self.state[1] += dy
