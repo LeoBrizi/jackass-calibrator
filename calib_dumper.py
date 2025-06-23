@@ -123,7 +123,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-else:
-    print("This script is intended to be run as a standalone program.")
-    print("Use 'python calib_dumper.py <config.json>' to execute it.")
-    sys.exit(1)

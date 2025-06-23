@@ -8,6 +8,7 @@ from motion_model import DDBodyFrameModel, DDGyroModel
 from bisect import bisect_left
 from tqdm import tqdm
 
+import geometry
 
 
 class Ros2Reader:
@@ -18,8 +19,8 @@ class Ros2Reader:
         :param args:
         :param kwargs:
         """
-        joint_topic = kwargs.pop('joint_topic')
-        imu_topic = kwargs.pop('imu_topic')
+        joint_topic = kwargs.pop("joint_topic")
+        imu_topic = kwargs.pop("imu_topic")
         try:
             from rosbags.highlevel import AnyReader
         except ModuleNotFoundError:
@@ -55,7 +56,9 @@ class Ros2Reader:
         self.imu_timestamps = [t for _, t, _ in self.imu_messages]
 
         self.num_messages = len(self.joint_messages)
-        print(f"Found {len(self.joint_messages)} joint messages and {len(self.imu_messages)} IMU messages.")
+        print(
+            f"Found {len(self.joint_messages)} joint messages and {len(self.imu_messages)} IMU messages."
+        )
 
     def __len__(self):
         return self.num_messages
@@ -87,16 +90,18 @@ class Ros2Reader:
         i = bisect_left(self.imu_timestamps, joint_ts) -1
         if i == len(self.imu_timestamps):
             i -= 1  # Use the last one if we're past the end
-        print(f"Joint timestamp: {joint_ts}, IMU index: {i}, IMU timestamp: {self.imu_timestamps[i]}, difference: {(joint_ts - self.imu_timestamps[i])/1e9}")
+        print(
+            f"Joint timestamp: {joint_ts}, IMU index: {i}, IMU timestamp: {self.imu_timestamps[i]}, difference: {(joint_ts - self.imu_timestamps[i])/1e9}"
+        )
         imu_conn, imu_ts, imu_raw = self.imu_messages[i]
         imu_msg = self.bag.deserialize(imu_raw, imu_conn.msgtype)
         imu_q = imu_msg.orientation
         imu_angular_velocity = imu_msg.angular_velocity.z
-        
-        yaw = np.atan2(2.0*(imu_q.y*imu_q.z + imu_q.w*imu_q.x), imu_q.w*imu_q.w - imu_q.x*imu_q.x - imu_q.y*imu_q.y + imu_q.z*imu_q.z);
+
+        yaw = geometry.yaw_from_quaternion(imu_q)
 
         return joint_stamp, joint_names, joint_velocities, yaw, imu_angular_velocity
-    
+
 
 def main():
     if len(sys.argv) < 2:
@@ -140,9 +145,15 @@ def main():
     with Ros2Reader(data_dir, joint_topic=joints_topic, imu_topic=imu_topic) as reader:
         for i in range(len(reader)):
             # timestamp, names, positions, velocities = reader[i]
-            joint_stamp, joint_names, j_velocities, imu_theta, imu_angular_velocity = reader[i]
-            print(f"Timestamp: {joint_stamp}, Names: {joint_names}, Velocities: {j_velocities}")
-            joint_velocities = np.array([j_velocities[lut[name]] for name in joint_names])
+            joint_stamp, joint_names, j_velocities, imu_theta, imu_angular_velocity = (
+                reader[i]
+            )
+            print(
+                f"Timestamp: {joint_stamp}, Names: {joint_names}, Velocities: {j_velocities}"
+            )
+            joint_velocities = np.array(
+                [j_velocities[lut[name]] for name in joint_names]
+            )
             print(f"Joint Velocities: {joint_velocities}")
 
             v_l = joint_velocities[0] + joint_velocities[1]
@@ -154,16 +165,19 @@ def main():
             if i == 0:
                 prev_timestamp = joint_stamp
                 continue
-            
-            dt = joint_stamp - prev_timestamp
-            motion_model.getPose(np.array([v_r, v_l, imu_theta]),dt)
 
-            #dummp on a file
-            output_file.write(f"{joint_stamp} {v_r} {v_l} {imu_theta} {motion_model.state[0]} {motion_model.state[1]} {motion_model.state[2]}\n")
+            dt = joint_stamp - prev_timestamp
+            motion_model.getPose(np.array([v_r, v_l, imu_theta]), dt)
+
+            # dummp on a file
+            output_file.write(
+                f"{joint_stamp} {v_r} {v_l} {imu_theta} {motion_model.state[0]} {motion_model.state[1]} {motion_model.state[2]}\n"
+            )
 
             motion_model.state
 
             prev_timestamp = joint_stamp
+
 
 if __name__ == "__main__":
     main()
