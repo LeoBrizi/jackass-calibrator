@@ -188,7 +188,7 @@ def main():
     if kin_model_type == "DDBodyFrame" : 
         kinematic_params_ig = config.get("kinematic_params", [0.0, 0.0, 0.0])
     elif kin_model_type == "DDGyro" :
-        kinematic_params_ig = config.get("kinematic_params", [0.0, 0.0, 0.0])
+        kinematic_params_ig = config.get("kinematic_params", [0.0, 0.0, 0.0, 0.0])
     else:
         kinematic_params_ig = config.get("kinematic_params", [0.0, 0.0, 0.0, 0.0])
 

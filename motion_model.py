@@ -213,6 +213,7 @@ class DDGyroModel:
         self.k_l = kin_params[1]  # vel_to_meter
         # self.baseline = kin_params[2]  # Distance between the wheels
         self.imu_offset = kin_params[2]  # IMU offset from the center of the robot
+        self.imu_shift = kin_params[3]
 
         self.state = np.zeros(3)  # [x, y, theta]
         self.v_r = 0.0  # Right wheel velocity
@@ -230,12 +231,13 @@ class DDGyroModel:
 
 
     def getParams(self):
-        return np.array([self.k_r, self.k_l, self.imu_offset])
+        return np.array([self.k_r, self.k_l, self.imu_offset, self.imu_shift])
     
     def setParams(self, new_params):
         self.k_r = new_params[0]
         self.k_l = new_params[1]
         self.imu_offset = new_params[2]
+        self.imu_shift = new_params[3]
 
     def getLinearVel(self, vel_r, vel_l):
         self.v_r = self.k_r * vel_r
@@ -317,7 +319,7 @@ class DDGyroModel:
         #         if time_still > self.min_time_still: 
         #             self.estimateBias()
         #     self.imu_measurement = []  # Clear the IMU measurements after processing
-        imu_theta_in_robot = -vels_imu[2] + self.imu_offset
+        imu_theta_in_robot = vels_imu[2] * self.imu_offset + self.imu_shift
 
         dtheta = imu_theta_in_robot - self.state[2]
         dtheta = (dtheta + np.pi) % (2 * np.pi) - np.pi  # Normalize to [-pi, pi]
@@ -346,7 +348,7 @@ class DDGyroModel:
         
         :return: A new instance of DDBodyFrameModel with the same parameters
         """
-        copy = DDGyroModel([self.k_r, self.k_l, self.imu_offset])
+        copy = DDGyroModel([self.k_r, self.k_l, self.imu_offset, self.imu_shift])
         copy.state = self.state.copy()
         copy.v_r = self.v_r
         copy.v_l = self.v_l
