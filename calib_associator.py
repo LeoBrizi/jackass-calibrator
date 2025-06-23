@@ -42,7 +42,7 @@ def main():
         data = line.strip().split()
         if len(data) < 4:
             continue
-        timestamp = float(data[0]) *1e-9
+        timestamp = float(data[0]) * 1e-9
         x = float(data[4])
         y = float(data[8])
         cos_theta = float(data[1])
@@ -70,7 +70,6 @@ def main():
 
         # find the corresponding lidar estimate
         closest_lidar_ts = min(lidar_ts, key=lambda ts: abs(ts - motion_timestamp))
-
         if(abs(closest_lidar_ts - motion_timestamp) > min_time_diff):  # threshold for matching timestamps
             # out_file.write(f"{motion_timestamp} {v_r} {v_l} {motion_x} {motion_y} {motion_theta}\n")
             out_file.write(f"{line}\n")

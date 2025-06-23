@@ -112,7 +112,7 @@ def main():
                 continue
             
             dt = timestamp - prev_timestamp
-            motion_model.getPose(v_r, v_l, dt)
+            motion_model.getPose(np.array([v_r, v_l]), dt)
 
             #dummp on a file
             output_file.write(f"{timestamp} {v_r} {v_l} {motion_model.state[0]} {motion_model.state[1]} {motion_model.state[2]}\n")

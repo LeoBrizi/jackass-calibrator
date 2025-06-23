@@ -320,6 +320,7 @@ class DDGyroModel:
         #             self.estimateBias()
         #     self.imu_measurement = []  # Clear the IMU measurements after processing
         imu_theta_in_robot = vels_imu[2] * self.imu_offset + self.imu_shift
+        imu_theta_in_robot = (imu_theta_in_robot + np.pi) % (2 * np.pi) - np.pi  # Normalize to [-pi, pi]
 
         dtheta = imu_theta_in_robot - self.state[2]
         dtheta = (dtheta + np.pi) % (2 * np.pi) - np.pi  # Normalize to [-pi, pi]
