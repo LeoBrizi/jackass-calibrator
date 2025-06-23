@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Tuple
 import numpy as np
 import json
-from motion_model import DDBodyFrameModel, DDGlobalFrameModel
+from motion_model import DDBodyFrameModel
 
 
 class Ros2Reader:

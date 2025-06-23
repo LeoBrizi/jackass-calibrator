@@ -58,7 +58,8 @@ def main():
 
     # loop over  motion model file lines
     for line in motion_model_file:
-        motion_model_data = line.strip().split()
+        line = line.strip()
+        motion_model_data = line.split()
 
         motion_timestamp = float(motion_model_data[0])
         v_r = float(motion_model_data[1])
@@ -71,7 +72,8 @@ def main():
         closest_lidar_ts = min(lidar_ts, key=lambda ts: abs(ts - motion_timestamp))
 
         if(abs(closest_lidar_ts - motion_timestamp) > min_time_diff):  # threshold for matching timestamps
-            out_file.write(f"{motion_timestamp} {v_r} {v_l} {motion_x} {motion_y} {motion_theta}\n")
+            # out_file.write(f"{motion_timestamp} {v_r} {v_l} {motion_x} {motion_y} {motion_theta}\n")
+            out_file.write(f"{line}\n")
             continue
 
         if closest_lidar_ts in lidar_estimates:
@@ -79,8 +81,9 @@ def main():
             print(f"Found matching timestamps: {motion_timestamp}")
             print(f"Motion Model: {motion_x}, {motion_y}, {motion_theta}")
             print(f"Lidar Estimate: {lidar_x}, {lidar_y}, {lidar_theta}")
-            out_file.write(f"{motion_timestamp} {v_r} {v_l} {motion_x} {motion_y} {motion_theta} "
-                           f"{lidar_x} {lidar_y} {lidar_theta} {closest_lidar_ts}\n")
+            # out_file.write(f"{motion_timestamp} {v_r} {v_l} {motion_x} {motion_y} {motion_theta} "
+                        #    f"{lidar_x} {lidar_y} {lidar_theta} {closest_lidar_ts}\n")
+            out_file.write(f"{line} {lidar_x} {lidar_y} {lidar_theta} {closest_lidar_ts}\n")
 
 if __name__ == "__main__":
     main()

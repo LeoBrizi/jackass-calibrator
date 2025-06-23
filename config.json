@@ -1,8 +1,6 @@
 {
-  "motion_model": "DDBodyFrame",
-  "kinematic_params": [
-    0.0924379711241535, 0.09206977407707143, 0.5372927964043419
-  ],
+  "motion_model": "DDGyro",
+  "kinematic_params": [0.0924379711241535, 0.09206977407707143, 2],
   "lidar_offset": [
     -0.16705944914964835, -0.002813190970535312, 0.008070034871175746
   ],
@@ -13,9 +11,10 @@
     "front_right_wheel_joint",
     "rear_right_wheel_joint"
   ],
+  "imu_topic": "/j100_0819/sensors/imu_0/data",
 
   "bag_path": "/mnt/usb-HKVSN_MD202_012938000AE9-0:0-part1/jackass/bags/rosbag2_2025_06_16-09_39_20",
-  "dump_file": "calib_dump.txt",
+  "dump_file": "calib_dump_imu.txt",
   "laser_estimate": "/mnt/usb-HKVSN_MD202_012938000AE9-0:0-part1/jackass/bags/estimate.txt",
 
   "min_time_diff": 0.01,

@@ -6,7 +6,7 @@ import numpy as np
 import json
 
 from geometry import T,R, exp, log
-from motion_model import DDBodyFrameModel, DDGlobalFrameModel, SKSModel
+from motion_model import DDBodyFrameModel, DDGyroModel, SKSModel
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
@@ -42,9 +42,10 @@ class CalibSolver:
 
         prev_timestamp = encoder_measurements[0][0]  # First timestamp from the encoder data
 
-        for ts, vel_r, vel_l in encoder_measurements:
+        for i in range(len(encoder_measurements)):
+            ts = encoder_measurements[i][0]
             dt = ts - prev_timestamp
-            kin_model_temp.getPose(vel_r, vel_l, dt)
+            kin_model_temp.getPose(encoder_measurements[i][1:], dt)
             prev_timestamp = ts
 
         odom_state = kin_model_temp.getState()
@@ -186,6 +187,8 @@ def main():
     
     if kin_model_type == "DDBodyFrame" : 
         kinematic_params_ig = config.get("kinematic_params", [0.0, 0.0, 0.0])
+    elif kin_model_type == "DDGyro" :
+        kinematic_params_ig = config.get("kinematic_params", [0.0, 0.0, 0.0])
     else:
         kinematic_params_ig = config.get("kinematic_params", [0.0, 0.0, 0.0, 0.0])
 
@@ -205,28 +208,33 @@ def main():
         lines = calib_data_file.readlines()
         for i, line in enumerate(lines):
             data = line.strip().split()
-
+            
             encoder_ts = float(data[0])
             vel_r = float(data[1])
             vel_l = float(data[2])
-            
-            encoder_data.append((encoder_ts, vel_r, vel_l))
-            
-            if len(data) < 7:
-                # line without lidar estimate
 
+            if kin_model_type == "DDGyro":
+                theta_imu = float(data[3])
+                encoder_data.append((encoder_ts, vel_r, vel_l, theta_imu))
+            else:
+                encoder_data.append((encoder_ts, vel_r, vel_l))
+                
+            if len(data) < 8:
+                # line without lidar estimate
                 continue
-            
-            lidar_x = float(data[6])
-            lidar_y = float(data[7])
-            lidar_theta = float(data[8])
-            lidar_ts = float(data[9])
+                
+            lidar_x = float(data[-4])
+            lidar_y = float(data[-3])
+            lidar_theta = float(data[-2])
+            lidar_ts = float(data[-1])
 
             lidar_data.append((lidar_ts, lidar_x, lidar_y, lidar_theta))
             ass_lidar[len(lidar_data)-1] = i
     
     if kin_model_type == "DDBodyFrame" :
         calib_solver = CalibSolver(DDBodyFrameModel(kinematic_params_ig), lidar_pose_ig, iteration=iteration, tolerance=tolerance, epsilon=epsilon, dumping=dumping, min_movement=min_movement, min_angle=min_angle, params_mask=params_mask)
+    elif kin_model_type == "DDGyro":
+        calib_solver = CalibSolver(DDGyroModel(kinematic_params_ig), lidar_pose_ig, iteration=iteration, tolerance=tolerance, epsilon=epsilon, dumping=dumping, min_movement=min_movement, min_angle=min_angle, params_mask=params_mask)
     else:
         calib_solver = CalibSolver(SKSModel(kinematic_params_ig), lidar_pose_ig, iteration=iteration, tolerance=tolerance, epsilon=epsilon, dumping=dumping, min_movement=min_movement, min_angle=min_angle, params_mask=params_mask)
 
@@ -238,6 +246,8 @@ def main():
 
     if kin_model_type == "DDBodyFrame" :
         motion_model = DDBodyFrameModel(calib_solver.kin_param)
+    elif kin_model_type == "DDGyro":
+        motion_model = DDGyroModel(calib_solver.kin_param)
     else:
         motion_model = SKSModel(calib_solver.kin_param)
 
@@ -248,9 +258,9 @@ def main():
     for i in range(len(encoder_data)):
         if i == 0:
             continue
-        ts, vel_r, vel_l = encoder_data[i]
+        ts = encoder_data[i][0]
         dt = ts - encoder_data[i-1][0]
-        motion_model.getPose(vel_r, vel_l, dt)
+        motion_model.getPose(encoder_data[i][1:], dt)
         odom_state = motion_model.getState()
 
         T_odom = exp(odom_state[0], odom_state[1], odom_state[2])
