@@ -84,7 +84,7 @@ class Ros2Reader:
         joint_velocities = np.array(joint_msg.velocity)
 
         # Find closest IMU message by timestamp
-        i = bisect_left(self.imu_timestamps, joint_ts) +1
+        i = bisect_left(self.imu_timestamps, joint_ts) -1
         if i == len(self.imu_timestamps):
             i -= 1  # Use the last one if we're past the end
         print(f"Joint timestamp: {joint_ts}, IMU index: {i}, IMU timestamp: {self.imu_timestamps[i]}, difference: {(joint_ts - self.imu_timestamps[i])/1e9}")
