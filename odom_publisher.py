@@ -56,7 +56,7 @@ class OdometryPublisher(Node):
 
         dt = joint_msg_stamp - self.prev_timestamp
         self.prev_timestamp = joint_msg_stamp
-        self.motion_model.getPose(v_r, v_l, dt)
+        self.motion_model.getPose([v_r, v_l], dt)
         odom_state = self.motion_model.getState()
 
         # Create odometry message
