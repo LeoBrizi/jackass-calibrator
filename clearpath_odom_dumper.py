@@ -6,7 +6,7 @@ import numpy as np
 import json
 
 from calib_dumper import Ros2Reader
-from geometry import yaw_from_quaternion
+import geometry
 
 
 class ClearpathOdomDumper(Ros2Reader):
@@ -18,7 +18,7 @@ class ClearpathOdomDumper(Ros2Reader):
         x = msg.pose.pose.position.x
         y = msg.pose.pose.position.y
         q = msg.pose.pose.orientation
-        theta = yaw_from_quaternion(q)
+        theta = geometry.yaw_from_quaternion(q)
         return msg_stamp, x, y, theta
 
 
@@ -46,9 +46,29 @@ def main():
     raw_file_path.touch()
     raw_file = open(raw_file_path, "w")
 
+    init_pose = np.array([0, 0, 0], dtype=np.float32)
+
+    t_lidar = np.array(
+        [-0.1671484301562502, -0.002786556286205523, 0.008026392598006193],
+        dtype=np.float32,
+    )
+    T_lidar_offset = geometry.exp(t_lidar[0], t_lidar[1], t_lidar[2])
+
     with ClearpathOdomDumper(data_dir, topic="/j100_0819/platform/odom") as reader:
         for i in range(len(reader)):
             timestamp, x, y, th = reader[i]
+            if i == 0:
+                init_pose = geometry.exp(x, y, th)
+                x, y, th = 0.0, 0.0, 0.0
+            else:
+                pose = geometry.exp(x, y, th)
+                delta_pose = geometry.log(np.linalg.inv(init_pose) @ pose)
+                x, y, th = delta_pose
+
+            x, y, th = geometry.log(
+                np.linalg.inv(T_lidar_offset) @ geometry.exp(x, y, th) @ T_lidar_offset
+            )
+
             print(f"Timestamp: {timestamp}, x: {x}, y: {y}, theta: {th}")
             raw_file.write(f"{timestamp} {x} {y} {th}\n")
 
@@ -61,6 +81,17 @@ def main():
     ) as reader:
         for i in range(len(reader)):
             timestamp, x, y, th = reader[i]
+            if i == 0:
+                init_pose = geometry.exp(x, y, th)
+                x, y, th = 0.0, 0.0, 0.0
+            else:
+                pose = geometry.exp(x, y, th)
+                delta_pose = geometry.log(np.linalg.inv(init_pose) @ pose)
+                x, y, th = delta_pose
+
+            x, y, th = geometry.log(
+                np.linalg.inv(T_lidar_offset) @ geometry.exp(x, y, th) @ T_lidar_offset
+            )
             print(f"Timestamp: {timestamp}, x: {x}, y: {y}, theta: {th}")
             filtered_file.write(f"{timestamp} {x} {y} {th}\n")
 

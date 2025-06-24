@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Tuple
 import numpy as np
 import json
-from motion_model import DDBodyFrameModel
+from motion_model import DDBodyFrameModel, DDBodyFrameModelExact
 
 
 class Ros2Reader:
@@ -15,7 +15,7 @@ class Ros2Reader:
         :param args:
         :param kwargs:
         """
-        topic = kwargs.pop('topic')
+        topic = kwargs.pop("topic")
         try:
             from rosbags.highlevel import AnyReader
         except ModuleNotFoundError:
@@ -56,6 +56,7 @@ class Ros2Reader:
         joints_velocities = msg.velocity
         return joint_msg_stamp, joints_names, joints_positions, joints_velocities
 
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python calib_dumper.py config_file")
@@ -82,7 +83,7 @@ def main():
 
     kinematic_parameters_ig = config.get("kinematic_params", [])
 
-    motion_model = DDBodyFrameModel(kinematic_parameters_ig)
+    motion_model = DDBodyFrameModelExact(kinematic_parameters_ig)
 
     # open the file
     output_file_path = Path(config.get("dump_file", "calib_dump.txt"))
@@ -97,7 +98,9 @@ def main():
     with Ros2Reader(data_dir, topic=joints_topics) as reader:
         for i in range(len(reader)):
             timestamp, names, positions, velocities = reader[i]
-            print(f"Timestamp: {timestamp}, Names: {names}, Positions: {positions}, Velocities: {velocities}")
+            print(
+                f"Timestamp: {timestamp}, Names: {names}, Positions: {positions}, Velocities: {velocities}"
+            )
             joint_velocities = np.array([velocities[lut[name]] for name in names])
             print(f"Joint Velocities: {joint_velocities}")
 
@@ -110,16 +113,19 @@ def main():
             if i == 0:
                 prev_timestamp = timestamp
                 continue
-            
-            dt = timestamp - prev_timestamp
-            motion_model.getPose(v_r, v_l, dt)
 
-            #dummp on a file
-            output_file.write(f"{timestamp} {v_r} {v_l} {motion_model.state[0]} {motion_model.state[1]} {motion_model.state[2]}\n")
+            dt = timestamp - prev_timestamp
+            motion_model.getPose([v_r, v_l], dt)
+
+            # dummp on a file
+            output_file.write(
+                f"{timestamp} {v_r} {v_l} {motion_model.state[0]} {motion_model.state[1]} {motion_model.state[2]}\n"
+            )
 
             motion_model.state
 
             prev_timestamp = timestamp
+
 
 if __name__ == "__main__":
     main()

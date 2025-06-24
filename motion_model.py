@@ -1,11 +1,13 @@
-
 import numpy as np
 
 from geometry import compute_rotation_from_acc
 from geometry import R, T, exp, log
-    
+
+
 class DDBodyFrameModel:
     def __init__(self, kin_params, *args, **kwargs):
+        if kin_params is None:
+            kin_params = [0.0, 0.0, 0.0]
         self.k_r = kin_params[0]  # vel_to_meter
         self.k_l = kin_params[1]  # vel_to_meter
         self.baseline = kin_params[2]  # Distance between the wheels
@@ -19,11 +21,11 @@ class DDBodyFrameModel:
     def getParams(self):
         """
         Get the parameters of the model.
-        
+
         :return: Tuple containing (k_r, k_l, baseline)
         """
         return np.array([self.k_r, self.k_l, self.baseline])
-    
+
     def setParams(self, new_params):
         """
         Set the parameters of the model.
@@ -37,7 +39,7 @@ class DDBodyFrameModel:
     def getVel(self, vel_r, vel_l):
         """
         Calculate the pose change based on the velocities of the right and left wheels.
-        
+
         :param vel_r: Velocity of the right wheel
         :param vel_l: Velocity of the left wheel
         :param dt: Time step
@@ -49,38 +51,38 @@ class DDBodyFrameModel:
         self.omega = (self.v_r - self.v_l) / self.baseline
 
         return self.v, self.omega
-    
-    def getPose(self, wheel_vel, dt): #vel_r, vel_l
+
+    def getPose(self, wheel_vel, dt):  # vel_r, vel_l
         """
         Calculate the pose change over a time step.
-        
+
         :param dt: Time step
         :return: Pose change as a tuple (dx, dy, dtheta)
         """
         self.getVel(wheel_vel[0], wheel_vel[1])
         dtheta = self.omega * dt
-        dx = self.v * np.cos(self.state[2] + dtheta/2) * dt
-        dy = self.v * np.sin(self.state[2] + dtheta/2) * dt
+        dx = self.v * np.cos(self.state[2] + dtheta / 2) * dt
+        dy = self.v * np.sin(self.state[2] + dtheta / 2) * dt
 
         self.state[0] += dx
         self.state[1] += dy
         self.state[2] += dtheta
         self.state[2] = (self.state[2] + np.pi) % (2 * np.pi) - np.pi
-        
+
         return dx, dy, dtheta
-    
+
     def getState(self):
         """
         Get the current state of the model.
-        
+
         :return: Current state as a numpy array [x, y, theta]
         """
         return self.state.copy()
-    
+
     def deepCopy(self):
         """
         Create a deep copy of the model.
-        
+
         :return: A new instance of DDBodyFrameModel with the same parameters
         """
         copy = DDBodyFrameModel([self.k_r, self.k_l, self.baseline])
@@ -90,7 +92,7 @@ class DDBodyFrameModel:
         copy.v = self.v
         copy.omega = self.omega
         return copy
-    
+
     def reset(self):
         """
         Reset the state of the model to the initial state.
@@ -101,8 +103,11 @@ class DDBodyFrameModel:
         self.v = 0.0
         self.omega = 0.0
 
+
 class SKSModel:
     def __init__(self, kin_params, *args, **kwargs) -> None:
+        if kin_params is None:
+            kin_params = [0.0, 0.0, 0.0, 0.0]
         self.k_r = kin_params[0]  # vel_to_meter
         self.k_l = kin_params[1]  # vel_to_meter
         self.baseline = kin_params[2]  # Distance between the wheels
@@ -117,7 +122,7 @@ class SKSModel:
     def setParams(self, params):
         """
         Set the parameters of the SKS model.
-        
+
         :param params: Parameters to set
         """
         self.k_r = params[0]
@@ -128,7 +133,7 @@ class SKSModel:
     def getParams(self):
         """
         Get the parameters of the SKS model.
-        
+
         :return: Parameters of the SKS model
         """
         return np.array([self.k_r, self.k_l, self.baseline, self.alpha])
@@ -136,7 +141,7 @@ class SKSModel:
     def getVel(self, vel_r, vel_l):
         """
         Calculate the pose change based on the velocities of the right and left wheels.
-        
+
         :param vel_r: Velocity of the right wheel
         :param vel_l: Velocity of the left wheel
         :param dt: Time step
@@ -148,11 +153,11 @@ class SKSModel:
         self.omega = (self.v_r - self.v_l) / self.baseline
 
         return self.v, self.omega
-    
-    def getPose(self, wheel_vel, dt): #vel_r, vel_l
+
+    def getPose(self, wheel_vel, dt):  # vel_r, vel_l
         """
         Calculate the pose change over a time step.
-        
+
         :param dt: Time step
         :return: Pose change as a tuple (dx, dy, dtheta)
         """
@@ -160,8 +165,8 @@ class SKSModel:
 
         dtheta = self.omega * dt
 
-        cos_theta = np.cos(self.state[2] + dtheta/2)
-        sin_theta = np.sin(self.state[2] + dtheta/2)
+        cos_theta = np.cos(self.state[2] + dtheta / 2)
+        sin_theta = np.sin(self.state[2] + dtheta / 2)
 
         dx = self.v * cos_theta * dt - self.alpha * self.omega * sin_theta * dt
         dy = self.v * sin_theta * dt + self.alpha * self.omega * cos_theta * dt
@@ -170,21 +175,21 @@ class SKSModel:
         self.state[1] += dy
         self.state[2] += dtheta
         self.state[2] = (self.state[2] + np.pi) % (2 * np.pi) - np.pi
-        
+
         return dx, dy, dtheta
-    
+
     def getState(self):
         """
         Get the current state of the model.
-        
+
         :return: Current state as a numpy array [x, y, theta]
         """
         return self.state.copy()
-    
+
     def deepCopy(self):
         """
         Create a deep copy of the model.
-        
+
         :return: A new instance of SKSModel with the same parameters
         """
         copy = SKSModel([self.k_r, self.k_l, self.baseline, self.alpha])
@@ -194,7 +199,7 @@ class SKSModel:
         copy.v = self.v
         copy.omega = self.omega
         return copy
-    
+
     def reset(self):
         """
         Reset the state of the model to the initial state.
@@ -209,6 +214,8 @@ class SKSModel:
 class DDGyroModel:
 
     def __init__(self, kin_params, *args, **kwargs):
+        if kin_params is None:
+            kin_params = [0.0, 0.0, 0.0]
         self.k_r = kin_params[0]  # vel_to_meter
         self.k_l = kin_params[1]  # vel_to_meter
         # self.baseline = kin_params[2]  # Distance between the wheels
@@ -225,13 +232,12 @@ class DDGyroModel:
 
         # self.R_imu_in_world = np.eye(3)  # Rotation matrix from IMU to world frame
         # self.estimate_g = False
-        
-        # self.min_time_still = kwargs.pop('min_time_still', 1.0)  # Minimum time to estimate gravity vector
 
+        # self.min_time_still = kwargs.pop('min_time_still', 1.0)  # Minimum time to estimate gravity vector
 
     def getParams(self):
         return np.array([self.k_r, self.k_l, self.imu_offset])
-    
+
     def setParams(self, new_params):
         self.k_r = new_params[0]
         self.k_l = new_params[1]
@@ -247,25 +253,25 @@ class DDGyroModel:
     # def estimateBias(self):
     #     """
     #     Estimate the bias from the IMU measurement.
-        
+
     #     :param imu_measurement: IMU measurement containing angular velocity
     #     :return: Estimated bias
     #     """
     #     self.gyro_bias = np.mean([m[2] for m in self.imu_measurement], axis=0)
     #     return self.gyro_bias
-    
+
     # def estimateGravityVector(self):
     #     """
     #     Estimate the gravity vector from the IMU measurements.
-        
+
     #     :return: Estimated gravity vector
     #     """
     #     if len(self.imu_measurement) == 0:
     #         print("No IMU measurements available to estimate gravity vector.")
     #         return self.estimate_g
-        
+
     #     time_still = self.imu_measurement[-1][0] - self.imu_measurement[0][0]
-        
+
     #     if time_still < self.min_time_still:
     #         print("Not enough time to estimate gravity vector.")
     #         return self.estimate_g
@@ -280,7 +286,7 @@ class DDGyroModel:
 
     #     self.estimate_g = True
     #     return self.estimate_g
-    
+
     # def integralDeltaOmega(self, imu_measurements):
     #     dtheta = 0.0
     #     for index,imu_measurement in enumerate(imu_measurements):
@@ -289,22 +295,22 @@ class DDGyroModel:
     #         ts, _, angular_velocity = imu_measurement
     #         # Subtract the bias from the angular velocity
     #         angular_velocity -= self.gyro_bias
-            
+
     #         vel_aligned = R @ angular_velocity
     #         omega = vel_aligned[2]
     #         inc_theta = omega * (ts - imu_measurements[0][0])
 
-    def getPose(self, vels_imu, dt): #vel_r, vel_l, imu_theta
+    def getPose(self, vels_imu, dt):  # vel_r, vel_l, imu_theta
         """
         Calculate the pose change over a time step.
-        
+
         :param vel_r: Velocity of the right wheel
         :param vel_l: Velocity of the left wheel
         :param dt: Time step
         :return: Pose change as a tuple (dx, dy, dtheta)
         """
         self.getLinearVel(vels_imu[0], vels_imu[1])
-        
+
         # if self.v == 0.0:
         #     self.imu_measurement.extend(imu_measurements)
         #     return 0.0, 0.0, 0.0
@@ -314,36 +320,36 @@ class DDGyroModel:
 
         #     if len(self.imu_measurement) > 1:
         #         time_still = self.imu_measurement[-1][0] - self.imu_measurement[0][0]
-        #         if time_still > self.min_time_still: 
+        #         if time_still > self.min_time_still:
         #             self.estimateBias()
         #     self.imu_measurement = []  # Clear the IMU measurements after processing
         imu_theta_in_robot = -vels_imu[2] + self.imu_offset
 
         dtheta = imu_theta_in_robot - self.state[2]
         dtheta = (dtheta + np.pi) % (2 * np.pi) - np.pi  # Normalize to [-pi, pi]
-            
-        dx = self.v * np.cos(self.state[2] + dtheta/2) * dt
-        dy = self.v * np.sin(self.state[2] + dtheta/2) * dt
+
+        dx = self.v * np.cos(self.state[2] + dtheta / 2) * dt
+        dy = self.v * np.sin(self.state[2] + dtheta / 2) * dt
 
         self.state[0] += dx
         self.state[1] += dy
         self.state[2] = imu_theta_in_robot  # Update the state with the IMU theta
         self.state[2] = (self.state[2] + np.pi) % (2 * np.pi) - np.pi
-        
+
         return dx, dy, dtheta
-    
+
     def getState(self):
         """
         Get the current state of the model.
-        
+
         :return: Current state as a numpy array [x, y, theta]
         """
         return self.state.copy()
-    
+
     def deepCopy(self):
         """
         Create a deep copy of the model.
-        
+
         :return: A new instance of DDBodyFrameModel with the same parameters
         """
         copy = DDGyroModel([self.k_r, self.k_l, self.imu_offset])
@@ -352,7 +358,7 @@ class DDGyroModel:
         copy.v_l = self.v_l
         copy.v = self.v
         return copy
-    
+
     def reset(self):
         """
         Reset the state of the model to the initial state.
@@ -361,3 +367,124 @@ class DDGyroModel:
         self.v_r = 0.0
         self.v_l = 0.0
         self.v = 0.0
+
+
+class DDBodyFrameModelExact(DDBodyFrameModel):
+
+    def __init__(self, kin_params, *args, **kwargs):
+        super().__init__(kin_params, *args, **kwargs)
+
+    def getPose(self, wheel_vel, dt):  # vel_r, vel_l
+        """
+        Calculate the pose change over a time step.
+
+        :param dt: Time step
+        :return: Pose change as a tuple (dx, dy, dtheta)
+        """
+        self.getVel(wheel_vel[0], wheel_vel[1])
+
+        if np.abs(self.omega) < 1e-6:
+            # do RK2
+            return super().getPose(wheel_vel, dt)
+        else:
+            r = self.v / self.omega
+            old_theta = self.state[2]
+            dtheta = self.omega * dt
+            self.state[2] += dtheta
+            dx = r * (np.sin(self.state[2]) - np.sin(old_theta))
+            dy = r * (np.cos(old_theta) - np.cos(self.state[2]))
+
+            self.state[0] += dx
+            self.state[1] += dy
+
+            return dx, dy, dtheta
+
+    def deepCopy(self):
+        """
+        Create a deep copy of the model.
+
+        :return: A new instance of DDBodyFrameModel with the same parameters
+        """
+        copy = DDBodyFrameModelExact([self.k_r, self.k_l, self.baseline])
+        copy.state = self.state.copy()
+        copy.v_r = self.v_r
+        copy.v_l = self.v_l
+        copy.v = self.v
+        copy.omega = self.omega
+        return copy
+
+
+class DDAdaptiveBaseline:
+    def __init__(self, kin_params, *args, **kwargs):
+        if kin_params is None:
+            kin_params = [0.0, 0.0, 0.0, 0.0]
+        self.k_r = kin_params[0]  # vel_to_meter
+        self.k_l = kin_params[1]  # vel_to_meter
+        self.b0 = kin_params[2]  # Distance between the wheels
+        self.alpha = kin_params[3]  # Adaptive coefficient
+
+        self.state = np.zeros(3)  # [x, y, theta]
+        self.v_r = 0.0  # Right wheel velocity
+        self.v_l = 0.0  # Left wheel velocity
+        self.v = 0.0  # Linear velocity
+        self.omega = 0.0  # Angular velocity
+
+    def getParams(self):
+        # TODO
+        pass
+
+    def setParams(self, new_params):
+        """
+        Set the parameters of the model.
+
+        :param new_params: Array containing (k_r, k_l, baseline)
+        """
+        # TODO
+        pass
+
+    def getVel(self, vel_r, vel_l):
+        """
+        Calculate the pose change based on the velocities of the right and left wheels.
+
+        :param vel_r: Velocity of the right wheel
+        :param vel_l: Velocity of the left wheel
+        :param dt: Time step
+        :return: Pose change as a tuple (dx, dy, dtheta)
+        """
+        # TODO
+        pass
+
+    def getPose(self, wheel_vel, dt):  # vel_r, vel_l
+        """
+        Calculate the pose change over a time step.
+
+        :param dt: Time step
+        :return: Pose change as a tuple (dx, dy, dtheta)
+        """
+        # TODO
+        pass
+
+    def getState(self):
+        """
+        Get the current state of the model.
+
+        :return: Current state as a numpy array [x, y, theta]
+        """
+        # TODO
+        pass
+
+    def deepCopy(self):
+        """
+        Create a deep copy of the model.
+
+        :return: A new instance of DDBodyFrameModel with the same parameters
+        """
+        # TODO
+        pass
+
+    def reset(self):
+        """
+        Reset the state of the model to the initial state.
+        """
+        # TODO
+        pass
