@@ -401,6 +401,7 @@ class DDBodyFrameModelExact(DDBodyFrameModel):
 
             self.state[0] += dx
             self.state[1] += dy
+            self.state[2] = (self.state[2] + np.pi) % (2 * np.pi) - np.pi
 
             return dx, dy, dtheta
 
@@ -434,9 +435,10 @@ class DDAdaptiveBaseline:
         self.v = 0.0  # Linear velocity
         self.omega = 0.0  # Angular velocity
 
+        self.old_theta = 0.0
+
     def getParams(self):
-        # TODO
-        pass
+        return np.array([self.k_r, self.k_l, self.b0, self.alpha])
 
     def setParams(self, new_params):
         """
@@ -444,8 +446,10 @@ class DDAdaptiveBaseline:
 
         :param new_params: Array containing (k_r, k_l, baseline)
         """
-        # TODO
-        pass
+        self.k_r = new_params[0]
+        self.k_l = new_params[1]
+        self.b0 = new_params[2]
+        self.alpha = new_params[3]
 
     def getVel(self, vel_r, vel_l):
         """
@@ -456,8 +460,15 @@ class DDAdaptiveBaseline:
         :param dt: Time step
         :return: Pose change as a tuple (dx, dy, dtheta)
         """
-        # TODO
-        pass
+        self.v_r = self.k_r * vel_r
+        self.v_l = self.k_l * vel_l
+
+        self.adaptive_baseline = self.b0 + self.alpha * np.abs(vel_r - vel_l)
+
+        self.v = (self.v_r + self.v_l) / 2.0
+        self.omega = (self.v_r - self.v_l) / self.adaptive_baseline
+
+        return self.v, self.omega
 
     def getPose(self, wheel_vel, dt):  # vel_r, vel_l
         """
@@ -466,8 +477,17 @@ class DDAdaptiveBaseline:
         :param dt: Time step
         :return: Pose change as a tuple (dx, dy, dtheta)
         """
-        # TODO
-        pass
+        self.getVel(wheel_vel[0], wheel_vel[1])
+        dtheta = self.omega * dt
+        dx = self.v * np.cos(self.state[2] + dtheta / 2) * dt
+        dy = self.v * np.sin(self.state[2] + dtheta / 2) * dt
+
+        self.state[0] += dx
+        self.state[1] += dy
+        self.state[2] += dtheta
+        self.state[2] = (self.state[2] + np.pi) % (2 * np.pi) - np.pi
+
+        return dx, dy, dtheta
 
     def getState(self):
         """
@@ -475,8 +495,7 @@ class DDAdaptiveBaseline:
 
         :return: Current state as a numpy array [x, y, theta]
         """
-        # TODO
-        pass
+        return self.state.copy()
 
     def deepCopy(self):
         """
@@ -484,12 +503,20 @@ class DDAdaptiveBaseline:
 
         :return: A new instance of DDBodyFrameModel with the same parameters
         """
-        # TODO
-        pass
+        copy = DDAdaptiveBaseline([self.k_r, self.k_l, self.b0, self.alpha])
+        copy.state = self.state.copy()
+        copy.v_r = self.v_r
+        copy.v_l = self.v_l
+        copy.v = self.v
+        copy.omega = self.omega
+        return copy
 
     def reset(self):
         """
         Reset the state of the model to the initial state.
         """
-        # TODO
-        pass
+        self.state = np.zeros(3)
+        self.v_r = 0.0
+        self.v_l = 0.0
+        self.v = 0.0
+        self.omega = 0.0

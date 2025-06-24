@@ -6,7 +6,13 @@ import numpy as np
 import json
 
 from geometry import T, R, exp, log
-from motion_model import DDBodyFrameModel, DDGyroModel, SKSModel, DDBodyFrameModelExact
+from motion_model import (
+    DDBodyFrameModel,
+    DDGyroModel,
+    SKSModel,
+    DDBodyFrameModelExact,
+    DDAdaptiveBaseline,
+)
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
@@ -16,6 +22,7 @@ models = {
     "DDGyro": DDGyroModel,
     "DDBodyFrameExact": DDBodyFrameModelExact,
     "SKS": SKSModel,
+    "DDAdaptiveBaseline": DDAdaptiveBaseline,
 }
 
 
