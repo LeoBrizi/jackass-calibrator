@@ -5,6 +5,7 @@
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <iostream>
 #include <rclcpp_components/register_node_macro.hpp>
+#include <sensor_msgs/point_cloud2_iterator.hpp>
 
 Eigen::Matrix4d parseMatrix(const std::vector<std::vector<double>>& vec);
 
@@ -38,8 +39,8 @@ mad_icp_ros::Odometry::Odometry(const rclcpp::NodeOptions& options)
   yaml_dataset_config = YAML::LoadFile(dataset_config_file_path_);
   yaml_mad_icp_config = YAML::LoadFile(mad_icp_config_file_path_);
 
-  const double min_range = yaml_dataset_config["min_range"].as<double>();
-  const double max_range = yaml_dataset_config["max_range"].as<double>();
+  min_range_ = yaml_dataset_config["min_range"].as<double>();
+  max_range_ = yaml_dataset_config["max_range"].as<double>();
   const double sensor_hz = yaml_dataset_config["sensor_hz"].as<double>();
   const bool deskew = yaml_dataset_config["deskew"].as<bool>();
   // parsing lidar in base homogenous transformation
@@ -74,14 +75,33 @@ mad_icp_ros::Odometry::Odometry(const rclcpp::NodeOptions& options)
 void mad_icp_ros::Odometry::pointcloud_callback(
     const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
   // Convert the PointCloud2 message to mad_icp's ContainerType (std::vector
-  // of
-  // 3d points)
+  // of 3d points)
   auto stamp = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
 
+  // mad icp uses unordered clouds
   auto height = msg->height;
   auto width = msg->width;
 
-  RCLCPP_INFO(get_logger(), "stamp: %f, %dx%d", stamp, height, width);
+  sensor_msgs::PointCloud2ConstIterator<float> iter_x(*msg, "x");
+  sensor_msgs::PointCloud2ConstIterator<float> iter_y(*msg, "y");
+  sensor_msgs::PointCloud2ConstIterator<float> iter_z(*msg, "z");
+  // TODO filter on intensity
+  // sensor_msgs::PointCloud2ConstIterator<float> iter_int(*msg, "intensity");
+
+  pc_container_.clear();  // is this necessary?
+  pc_container_.reserve(msg->height * msg->width);
+
+  for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
+    auto point = Eigen::Vector3d{*iter_x, *iter_y, *iter_z};
+    if (point.norm() < min_range_ || point.norm() > max_range_ ||
+        std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()))
+      continue;
+
+    pc_container_.emplace_back(point);
+  }
+
+  pipeline_->compute(stamp, pc_container_);
+  std::cout << pipeline_->currentPose() << std::endl;
 }
 
 Eigen::Matrix4d parseMatrix(const std::vector<std::vector<double>>& vec) {

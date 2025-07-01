@@ -23,5 +23,8 @@ class Odometry : public rclcpp::Node {
   ContainerType pc_container_;
   // PointCloud2 -> std::vector -> madtree (can I save 1 conversion if I write
   // PointCloud2 to madtree?)
+
+  double min_range_{0};
+  double max_range_{0};
 };
 }  // namespace mad_icp_ros
