@@ -1,3 +1,4 @@
+#include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
@@ -10,6 +11,8 @@ class Odometry : public rclcpp::Node {
   Odometry(const rclcpp::NodeOptions& options);
 
  protected:
+  std::string frame_id_{"base_link"};
+
   std::string dataset_config_file_path_;
   std::string mad_icp_config_file_path_;
 
@@ -26,5 +29,11 @@ class Odometry : public rclcpp::Node {
 
   double min_range_{0};
   double max_range_{0};
+
+  rclcpp::Time stamp_;
+
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+
+  void publish_odom() const;
 };
 }  // namespace mad_icp_ros

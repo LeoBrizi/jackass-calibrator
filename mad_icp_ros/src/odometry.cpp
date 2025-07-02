@@ -1,5 +1,6 @@
 #include "mad_icp_ros/odometry.h"
 
+#include <tf2/LinearMath/Quaternion.h>
 #include <yaml-cpp/yaml.h>
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
@@ -61,6 +62,10 @@ mad_icp_ros::Odometry::Odometry(const rclcpp::NodeOptions& options)
       std::make_unique<Pipeline>(sensor_hz, deskew, b_max, rho_ker, p_th, b_min,
                                  b_ratio, num_keyframes, num_cores, realtime);
 
+  // Instance the odom publisher
+  // TODO think about which QOS we want
+  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+
   // Instance the PointCloud2 subscriber
 
   // set the qos to match the ouster
@@ -76,7 +81,12 @@ void mad_icp_ros::Odometry::pointcloud_callback(
     const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
   // Convert the PointCloud2 message to mad_icp's ContainerType (std::vector
   // of 3d points)
-  auto stamp = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+  // auto new_stamp = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+  // if stamp_ > new_stamp {
+
+  // }
+
+  stamp_ = msg->header.stamp;
 
   // mad icp uses unordered clouds
   auto height = msg->height;
@@ -100,12 +110,13 @@ void mad_icp_ros::Odometry::pointcloud_callback(
     pc_container_.emplace_back(point);
   }
 
-  pipeline_->compute(stamp, pc_container_);
-  std::cout << pipeline_->currentPose() << std::endl;
+  pipeline_->compute(msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9,
+                     pc_container_);
+  // std::cout << pipeline_->currentPose() << std::endl;
+  publish_odom();
 }
 
 Eigen::Matrix4d parseMatrix(const std::vector<std::vector<double>>& vec) {
-  // this need to be done to respect config file <shit>
   std::vector<double> mat_vec;
   for (int r = 0; r < 4; ++r) {
     for (int c = 0; c < 4; ++c) {
@@ -116,4 +127,38 @@ Eigen::Matrix4d parseMatrix(const std::vector<std::vector<double>>& vec) {
       mat_vec.data());
 }
 
+void mad_icp_ros::Odometry::publish_odom() const {
+  auto pose = pipeline_->currentPose();
+  // Extract translation
+  double x = pose(0, 3);
+  double y = pose(1, 3);
+  double z = pose(2, 3);
+
+  // Extract rotation matrix
+  Eigen::Matrix3d R = pose.block<3, 3>(0, 0);
+
+  Eigen::Quaterniond q(R);
+  q.normalize();
+
+  nav_msgs::msg::Odometry odom;
+  odom.header.stamp = stamp_;
+  odom.header.frame_id = "odom";
+
+  odom.pose.pose.position.x = x;
+  odom.pose.pose.position.y = y;
+  odom.pose.pose.position.z = z;
+
+  odom.pose.pose.orientation.x = q.x();
+  odom.pose.pose.orientation.y = q.y();
+  odom.pose.pose.orientation.z = q.z();
+  odom.pose.pose.orientation.w = q.w();
+
+  odom.child_frame_id = frame_id_;
+
+  odom.twist.twist.linear.x = 0.0;
+  odom.twist.twist.angular.z = 0.0;
+
+  odom_pub_->publish(odom);
+  return;
+}
 RCLCPP_COMPONENTS_REGISTER_NODE(mad_icp_ros::Odometry)

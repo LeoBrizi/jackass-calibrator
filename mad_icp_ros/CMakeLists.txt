@@ -10,6 +10,8 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2 REQUIRED)
 
 find_package(mad_icp QUIET)
 
@@ -43,6 +45,8 @@ ament_target_dependencies(mad_icp_ros_components
   rclcpp 
   rclcpp_components
   sensor_msgs
+  nav_msgs
+  tf2
 )
 
 target_link_libraries(mad_icp_ros_components
