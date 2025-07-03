@@ -66,6 +66,9 @@ mad_icp_ros::Odometry::Odometry(const rclcpp::NodeOptions& options)
   // TODO think about which QOS we want
   odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
 
+  // Instance the tf2 broadcaster
+  tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+
   // Instance the PointCloud2 subscriber
 
   // set the qos to match the ouster
@@ -79,8 +82,6 @@ mad_icp_ros::Odometry::Odometry(const rclcpp::NodeOptions& options)
 
 void mad_icp_ros::Odometry::pointcloud_callback(
     const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-  // Convert the PointCloud2 message to mad_icp's ContainerType (std::vector
-  // of 3d points)
   // auto new_stamp = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
   // if stamp_ > new_stamp {
 
@@ -92,28 +93,28 @@ void mad_icp_ros::Odometry::pointcloud_callback(
   auto height = msg->height;
   auto width = msg->width;
 
+  // Convert the PointCloud2 message to mad_icp's ContainerType (std::vector
+  // of 3d points)
   sensor_msgs::PointCloud2ConstIterator<float> iter_x(*msg, "x");
   sensor_msgs::PointCloud2ConstIterator<float> iter_y(*msg, "y");
   sensor_msgs::PointCloud2ConstIterator<float> iter_z(*msg, "z");
-  // TODO filter on intensity
-  // sensor_msgs::PointCloud2ConstIterator<float> iter_int(*msg, "intensity");
+  sensor_msgs::PointCloud2ConstIterator<float> iter_int(*msg, "intensity");
 
   pc_container_.clear();  // is this necessary?
   pc_container_.reserve(msg->height * msg->width);
 
-  for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
+  for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z, ++iter_int) {
     auto point = Eigen::Vector3d{*iter_x, *iter_y, *iter_z};
-    if (point.norm() < min_range_ || point.norm() > max_range_ ||
-        std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z()))
+    if (std::isnan(point.x()) || std::isnan(point.y()) ||
+        std::isnan(point.z()) || *iter_int < intensity_thr_ ||
+        point.norm() < min_range_ || point.norm() > max_range_)
       continue;
-
     pc_container_.emplace_back(point);
   }
 
   pipeline_->compute(msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9,
                      pc_container_);
-  // std::cout << pipeline_->currentPose() << std::endl;
-  publish_odom();
+  publish_odom_tf();
 }
 
 Eigen::Matrix4d parseMatrix(const std::vector<std::vector<double>>& vec) {
@@ -127,17 +128,14 @@ Eigen::Matrix4d parseMatrix(const std::vector<std::vector<double>>& vec) {
       mat_vec.data());
 }
 
-void mad_icp_ros::Odometry::publish_odom() const {
+void mad_icp_ros::Odometry::publish_odom_tf() const {
   auto pose = pipeline_->currentPose();
-  // Extract translation
+  // auto vel = pipeline_->currentVel(); // extract also velocity?
   double x = pose(0, 3);
   double y = pose(1, 3);
   double z = pose(2, 3);
 
-  // Extract rotation matrix
-  Eigen::Matrix3d R = pose.block<3, 3>(0, 0);
-
-  Eigen::Quaterniond q(R);
+  Eigen::Quaterniond q(pose.block<3, 3>(0, 0));
   q.normalize();
 
   nav_msgs::msg::Odometry odom;
@@ -155,10 +153,23 @@ void mad_icp_ros::Odometry::publish_odom() const {
 
   odom.child_frame_id = frame_id_;
 
-  odom.twist.twist.linear.x = 0.0;
-  odom.twist.twist.angular.z = 0.0;
-
   odom_pub_->publish(odom);
+
+  geometry_msgs::msg::TransformStamped transform;
+  transform.header.stamp = stamp_;
+  transform.header.frame_id = "odom";
+  transform.child_frame_id = frame_id_;
+
+  transform.transform.translation.x = x;
+  transform.transform.translation.y = y;
+  transform.transform.translation.z = z;
+
+  transform.transform.rotation.x = q.x();
+  transform.transform.rotation.y = q.y();
+  transform.transform.rotation.z = q.z();
+  transform.transform.rotation.w = q.w();
+
+  tf_broadcaster_->sendTransform(transform);
   return;
 }
 RCLCPP_COMPONENTS_REGISTER_NODE(mad_icp_ros::Odometry)

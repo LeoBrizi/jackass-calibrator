@@ -12,6 +12,7 @@ find_package(yaml-cpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 find_package(mad_icp QUIET)
 
@@ -47,6 +48,7 @@ ament_target_dependencies(mad_icp_ros_components
   sensor_msgs
   nav_msgs
   tf2
+  tf2_ros
 )
 
 target_link_libraries(mad_icp_ros_components
