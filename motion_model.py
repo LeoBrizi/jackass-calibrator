@@ -239,6 +239,18 @@ class DDGyroModel:
     def getParams(self):
         return np.array([self.k_r, self.k_l, self.imu_offset, self.imu_shift])
 
+    def initializeFromIMU(self, imu_theta):
+        """
+        Initialize the state theta to match the first IMU reading.
+        This should be called before the first getPose() call to avoid
+        a large initial jump.
+
+        :param imu_theta: Initial IMU yaw angle in radians
+        """
+        imu_theta_in_robot = imu_theta * self.imu_offset + self.imu_shift
+        imu_theta_in_robot = (imu_theta_in_robot + np.pi) % (2 * np.pi) - np.pi
+        self.state[2] = imu_theta_in_robot
+
     def setParams(self, new_params):
         self.k_r = new_params[0]
         self.k_l = new_params[1]

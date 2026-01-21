@@ -87,9 +87,15 @@ class Ros2Reader:
         joint_velocities = np.array(joint_msg.velocity)
 
         # Find closest IMU message by timestamp
-        i = bisect_left(self.imu_timestamps, joint_ts) -1
-        if i == len(self.imu_timestamps):
+        i = bisect_left(self.imu_timestamps, joint_ts)
+        if i == 0:
+            pass  # Use first IMU message
+        elif i == len(self.imu_timestamps):
             i -= 1  # Use the last one if we're past the end
+        else:
+            # Pick the closer of i-1 and i
+            if (joint_ts - self.imu_timestamps[i - 1]) <= (self.imu_timestamps[i] - joint_ts):
+                i -= 1
         print(
             f"Joint timestamp: {joint_ts}, IMU index: {i}, IMU timestamp: {self.imu_timestamps[i]}, difference: {(joint_ts - self.imu_timestamps[i])/1e9}"
         )
@@ -126,8 +132,6 @@ def main():
         print(f"Data directory {data_dir} does not exist.")
         sys.exit(1)
 
-    lut = {name: idx for idx, name in enumerate(joints_name_order)}
-
     kinematic_parameters_ig = config.get("kinematic_params", [])
 
     motion_model = DDGyroModel(kinematic_parameters_ig)
@@ -151,8 +155,10 @@ def main():
             print(
                 f"Timestamp: {joint_stamp}, Names: {joint_names}, Velocities: {j_velocities}"
             )
+            # Create lookup from message names to message indices, then reorder to config order
+            msg_lut = {name: idx for idx, name in enumerate(joint_names)}
             joint_velocities = np.array(
-                [j_velocities[lut[name]] for name in joint_names]
+                [j_velocities[msg_lut[name]] for name in joints_name_order]
             )
             print(f"Joint Velocities: {joint_velocities}")
 
@@ -164,6 +170,8 @@ def main():
 
             if i == 0:
                 prev_timestamp = joint_stamp
+                # Initialize the motion model state to match the first IMU reading
+                motion_model.initializeFromIMU(imu_theta)
                 continue
 
             dt = joint_stamp - prev_timestamp
