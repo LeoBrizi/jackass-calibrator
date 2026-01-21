@@ -15,9 +15,9 @@
   ],
   "imu_topic": "/j100_0819/sensors/imu_0/data",
 
-  "bag_path": "/mnt/usb-HKVSN_MD202_012938000AE9-0:0-part1/jackass/bags/rosbag2_2025_06_23-17_01_59",
-  "dump_file": "calib_dump_23.txt",
-  "laser_estimate": "/mnt/usb-HKVSN_MD202_012938000AE9-0:0-part1/jackass/bags/estimate.txt",
+  "bag_path": "/media/leonardo/cionco/calibration_bags/base_lidar",
+  "dump_file": "calib_dump.txt",
+  "laser_estimate": "/media/leonardo/cionco/calibration_bags/estimate.txt",
 
   "min_time_diff": 0.01,
 
@@ -26,7 +26,7 @@
   "epsilon": 1e-5,
   "dumping": 1,
   "min_movement": 2,
-  "min_angle": 0.2,
+  "min_angle": 0.1,
   "params_mask": [1, 1, 1, 1, 1, 1],
 
   "time_period": 0.02,

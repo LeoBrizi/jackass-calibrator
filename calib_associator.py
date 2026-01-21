@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Tuple
 import numpy as np
 import json
+from geometry import yaw_from_quaternion_values
 
 def main():
     if len(sys.argv) < 2:
@@ -36,18 +37,19 @@ def main():
 
     lidar_estimate_data = lidar_estimate_file.readlines()
 
-    #construct a dictionary to hold lidar estimates
+    #construct a dictionary to hold lidar estimates (TUM format)
+    # TUM format: timestamp tx ty tz qx qy qz qw
     lidar_estimates = {}
     for line in lidar_estimate_data:
         data = line.strip().split()
-        if len(data) < 4:
+        if len(data) < 8:
             continue
-        timestamp = float(data[0]) * 1e-9
-        x = float(data[4])
-        y = float(data[8])
-        cos_theta = float(data[1])
-        sin_theta = float(data[5])
-        theta = np.arctan2(sin_theta, cos_theta)
+        timestamp = float(data[0]) * 1e-9  # Convert nanoseconds to seconds
+        x = float(data[1])
+        y = float(data[2])
+        # z = float(data[3])  # ignored for 2D
+        qx, qy, qz, qw = float(data[4]), float(data[5]), float(data[6]), float(data[7])
+        theta = yaw_from_quaternion_values(qx, qy, qz, qw)
         lidar_estimates[timestamp] = (x, y, theta)
 
     output_file = motion_model_integration_file.stem + "_associations.txt"

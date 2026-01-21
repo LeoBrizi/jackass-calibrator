@@ -88,3 +88,15 @@ def yaw_from_quaternion(q):
     roll, pitch, yaw = r.as_euler("xyz", degrees=False)
 
     return yaw
+
+
+def yaw_from_quaternion_values(qx, qy, qz, qw):
+    """
+    Extracts yaw from quaternion given as raw values.
+
+    :param qx, qy, qz, qw: Quaternion components
+    :return: Yaw angle in radians
+    """
+    r = Rotation.from_quat([qx, qy, qz, qw])
+    _, _, yaw = r.as_euler("xyz", degrees=False)
+    return yaw
